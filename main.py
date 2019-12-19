@@ -3,7 +3,7 @@ import sys
 import time
 import tkinter as tk  # импорт библиотеки tkinter
 from tkinter import ttk, messagebox  # импорт модуля TTk
-from  psycopg2 import errors
+
 import psycopg2  # импорт модуля бд
 
 
@@ -14,6 +14,9 @@ class Main(tk.Frame):
         self.db = db
         # self.view_records()
 
+    def Pass(self):
+        pass
+
     def initUI(self):  # главное окно
         self.toolbar = tk.Frame(bg='#d7d8e0', bd=2)
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
@@ -23,14 +26,20 @@ class Main(tk.Frame):
         #                             compound=tk.TOP, image=self.add_img)
         # btn_open_dialog.pack(side=tk.LEFT)
         #
+        self.currentUserImg = tk.PhotoImage(file='user.gif')
+        self.buttonCurrentUser = tk.Button(self.toolbar, text="Текущий пользователь: " + currentUser, bg='#d7d8e0', bd=0,
+                                           image=self.currentUserImg,
+                                           compound=tk.TOP, command=self.Pass)
+        self.buttonCurrentUser.pack(side=tk.LEFT)
         self.changeUserImg = tk.PhotoImage(file='update.gif')
-        self.buttonChangeUser = tk.Button(self.toolbar, text=currentUser, bg='#d7d8e0', bd=0, image=self.changeUserImg,
-                                       compound=tk.TOP, command=self.changeUser)
+        self.buttonChangeUser = tk.Button(self.toolbar, text="Сменить пользователя", bg='#d7d8e0', bd=0,
+                                          image=self.changeUserImg,
+                                          compound=tk.TOP, command=self.changeUser)
         self.buttonChangeUser.pack(side=tk.LEFT)
         #
         self.refreshImg = tk.PhotoImage(file='refresh.png')
         self.buttonRefresh = tk.Button(self.toolbar, text='обновить', bg='#d7d8e0', bd=0, image=self.refreshImg,
-                                             compound=tk.TOP, command=self.refresh)
+                                       compound=tk.TOP, command=self.refresh)
         self.buttonRefresh.pack(side=tk.RIGHT)
         #
         # self.search_img = tk.PhotoImage(file='search.gif')
@@ -59,9 +68,9 @@ class Main(tk.Frame):
         # for l in root.pack_slaves():
         #     l.destroy()
         # self.refreshMain()
-        self.buttonRefresh.configure(text=currentUser)
-        #self.db.cnangeUser()
-        #self.db.c.execute("SELECT * from \"employees\"")
+        self.buttonCurrentUser.configure(text="Текущий пользователь: " + currentUser)
+        # self.db.cnangeUser()
+        # self.db.c.execute("SELECT * from \"employees\"")
 
     # def records(self, description, costs, total):
     #     self.db.insert_data(description, costs, total)
@@ -85,6 +94,7 @@ class Main(tk.Frame):
     #     self.db.c.execute('''DELETE FROM finance''')
     #     self.db.conn.commit()
     #     self.view_records()
+
 
 #
 # class Child(tk.Toplevel):
@@ -148,6 +158,7 @@ class Main(tk.Frame):
 def hashFunc(s):
     return hashlib.sha3_256(s.encode()).hexdigest()
 
+
 def sqlFilter(s):
     bads = ["/", "\\", "|", "=", ">", "<", "CREATE", "SELECT", "FROM", "ALL", "*", "!",
             "ALL", "ANY", "BETWEEN", "IN", "LIKE", "OR", "SOME", "(", ")", "&", "^", "%",
@@ -156,6 +167,7 @@ def sqlFilter(s):
     for i in bads:
         s = s.replace(i, "").replace(i.lower(), "")
     return s.strip()
+
 
 hostnameIP = '157.230.19.140'
 dbName = "cousedb"
@@ -299,6 +311,7 @@ class DB:
             except Exception as e:
                 print(e)
         return availableTables
+
 
 def kill():
     time.sleep(1)
