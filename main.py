@@ -205,6 +205,8 @@ class EmployeeAuth(tk.Frame):
                   command=self.click
                   ).grid(row=3, column=1, padx=0, pady=20)
 
+
+
     def click(self):
         global conn, connectionFlag, currentUser
         try:
