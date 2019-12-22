@@ -10,8 +10,10 @@ import psycopg2  # импорт модуля бд
 class Main(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
-        self.initUI()
+        self.currentTable = None
         self.db = db
+        self.initUI()
+
         # self.view_records()
 
     def Pass(self):
@@ -26,51 +28,89 @@ class Main(tk.Frame):
         #                             compound=tk.TOP, image=self.add_img)
         # btn_open_dialog.pack(side=tk.LEFT)
         #
+        self.availableTables = db.getAvailableTables()
         self.currentUserImg = tk.PhotoImage(file='user.gif')
-        self.buttonCurrentUser = tk.Button(self.toolbar, text="Текущий пользователь: " + currentUser, bg='#d7d8e0', bd=0,
-                                           image=self.currentUserImg,
-                                           compound=tk.TOP, command=self.Pass)
+        self.buttonCurrentUser = tk.Button(self.toolbar, text="Текущий пользователь: " + currentUser, bg='#d7d8e0',
+                                           bd=0, image=self.currentUserImg, compound=tk.TOP, command=self.Pass)
+
         self.buttonCurrentUser.pack(side=tk.LEFT)
         self.changeUserImg = tk.PhotoImage(file='update.gif')
         self.buttonChangeUser = tk.Button(self.toolbar, text="Сменить пользователя", bg='#d7d8e0', bd=0,
-                                          image=self.changeUserImg,
-                                          compound=tk.TOP, command=self.changeUser)
+                                          image=self.changeUserImg, compound=tk.TOP, command=self.changeUser)
+
         self.buttonChangeUser.pack(side=tk.LEFT)
-        #
         self.refreshImg = tk.PhotoImage(file='refresh.png')
-        self.buttonRefresh = tk.Button(self.toolbar, text='обновить', bg='#d7d8e0', bd=0, image=self.refreshImg,
+        self.buttonRefresh = tk.Button(self.toolbar, text='Обновить', bg='#d7d8e0', bd=0, image=self.refreshImg,
                                        compound=tk.TOP, command=self.refresh)
-        self.buttonRefresh.pack(side=tk.RIGHT)
-        #
-        # self.search_img = tk.PhotoImage(file='search.gif')
-        # btn_open_search_dialog = tk.Button(toolbar, text='Поиск', bg='#d7d8e0', bd=0, image=self.search_img,
-        #                                    compound=tk.TOP, command=self.pas)
-        # btn_open_search_dialog.pack(side=tk.RIGHT)
+        self.buttonRefresh.pack(side=tk.LEFT)
 
-        self.tree = ttk.Treeview(self, columns=('ID', 'description', 'costs', 'total'), height=15, show='headings')
+        self.listBox = tk.Listbox(self.toolbar, height=5, width=16)
+        for i in self.availableTables:
+            self.listBox.insert(tk.END, i)
+        self.listBox.pack(side=tk.RIGHT)
 
-        self.tree.column('ID', width=30, anchor=tk.CENTER)
-        self.tree.column('description', width=365, anchor=tk.CENTER)
-        self.tree.column('costs', width=150, anchor=tk.CENTER)
-        self.tree.column('total', width=100, anchor=tk.CENTER)
+        self.searchImg = tk.PhotoImage(file='search.gif')
+        self.buttonSerch = tk.Button(self.toolbar, text='Посмотреть', bg='#d7d8e0', bd=0, image=self.searchImg,
+                                     compound=tk.TOP, command=self.showDb)
+        self.buttonSerch.pack(side=tk.RIGHT)
 
-        self.tree.heading('ID', text='ID')
-        self.tree.heading('description', text='Наименование')
-        self.tree.heading('costs', text='Статья дохода/расхода')
-        self.tree.heading('total', text='Сумма')
+        self.deleteImg = tk.PhotoImage(file='delete.png')
+        self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
+                                      compound=tk.TOP, command=self.deleteRecord)
+        self.buttonDelete.pack(side=tk.RIGHT)
 
-        self.tree.pack()
+    def deleteRecord(self):
+        messagebox.showwarning("Удалять записи может только админ",
+                               "Delete давать пользователям не безопасно\n Придётся делать защиту от дурачков")
+        try:
+            recordIdToDelete = self.tree.selection()[0]
+        except:
+            return
+        recordToDelete = self.tree.item(recordIdToDelete, "values")
+        with db.conn:
+            cur = db.conn.cursor()
+            cur.execute("DELETE from \"{}\" where private_number={}".format(self.currentTable, recordToDelete[0]))
+            db.conn.commit()
 
     def changeUser(self):
         EmployeeAuthRefresh()
 
     def refresh(self):
-        # for l in root.pack_slaves():
-        #     l.destroy()
-        # self.refreshMain()
         self.buttonCurrentUser.configure(text="Текущий пользователь: " + currentUser)
-        # self.db.cnangeUser()
-        # self.db.c.execute("SELECT * from \"employees\"")
+        for i in range(self.availableTables.__len__()):
+            self.listBox.delete(i, tk.END)
+        self.availableTables = db.getAvailableTables()
+        for i in self.availableTables:
+            self.listBox.insert(tk.END, i)
+        try:
+            currentTable = self.availableTables[self.listBox.curselection()[0]]
+        except:
+            return
+        self.showDb()
+
+    def showDb(self):
+        try:
+            self.currentTable = self.availableTables[self.listBox.curselection()[0]]
+        except:
+            return
+        with db.conn:
+            cur = db.conn.cursor()
+            cur.execute("SELECT * from \"{}\"".format(self.currentTable))
+            records = cur.fetchall()
+            db.conn.commit()
+        try:
+            self.tree.delete(*self.tree.get_children())
+            self.tree.destroy()
+        except:
+            pass
+        if self.currentTable == "employees":
+            tables = [" ID ", "ID пиццерии", "Фамилия", "  Имя  ", "Отчество",
+                      "Дата рождения", "Должность", "Адрес", "Позиция"]
+            self.tree = ttk.Treeview(self, height=25, show='headings', columns=tables)
+            [self.tree.column(table, width=table.__len__() * 10, anchor=tk.CENTER) for table in tables]
+            [self.tree.heading(table, text=table) for table in tables]
+            self.tree.pack()
+        [self.tree.insert('', 'end', values=row) for row in records]
 
     # def records(self, description, costs, total):
     #     self.db.insert_data(description, costs, total)
@@ -192,9 +232,9 @@ class EmployeeAuth(tk.Frame):
         nameField = tk.Entry(textvariable=self.username)
         passwordField = tk.Entry(textvariable=self.password, show="*")
 
-        nameField.insert(0, "artem")
+        nameField.insert(0, "pavel2")
         nameField.grid(row=0, column=1, padx=5, pady=5)
-        passwordField.insert(0, "123")
+        passwordField.insert(0, "Pavel2108")
         passwordField.grid(row=1, column=1, padx=5, pady=5)
 
         tk.Button(text="Подключиться",
@@ -204,8 +244,6 @@ class EmployeeAuth(tk.Frame):
                   pady="6",
                   command=self.click
                   ).grid(row=3, column=1, padx=0, pady=20)
-
-
 
     def click(self):
         global conn, connectionFlag, currentUser
@@ -262,11 +300,7 @@ class EmployeeAuthRefresh:
                   ).grid(row=3, column=1, padx=0, pady=20)
 
     def click(self):
-        global conn, connectionFlag, currentUser
-        try:
-            db.conn.close()
-        except:
-            pass
+        global connectionFlag, currentUser
         try:
             db.conn = psycopg2.connect(
                 database=dbName,
@@ -282,37 +316,41 @@ class EmployeeAuthRefresh:
             messagebox.showinfo("Успешное подключение", "{}:{}".format(hostnameIP, port))
             connectionFlag = True
             currentUser = self.username.get()
-            print(self.username.get())
+            # print(self.username.get())
+            # print(db.getAvailableTables())
 
 
 class DB:
     def __init__(self, conn):
         self.conn = conn
-        self.c = self.conn.cursor()
-        self.tables = ["address", "dish", "dish_ingredients", "dish_orders",
-                       "employees", "finance", "ingredients", "menu", "orders",
-                       "passport", "pizzeria", "positions", "producer", "tables",
+        self.tables = ["employees", "positions", "dish", "dish_ingredients", "dish_orders",
+                       "address", "finance", "ingredients", "menu", "orders",
+                       "passport", "pizzeria", "producer", "tables",
                        "units", "warehouse"]
 
-    def cnangeUser(self):
+    def getAvailableTables(self):
+        availableTables = []
+        with self.conn:
+            cur = self.conn.cursor()
+            for table in self.tables:
+                try:
+                    cur.execute("SELECT * from \"{}\"".format(table))
+                    cur.fetchall()
+                    availableTables.append(table)
+                except:
+                    pass
+                finally:
+                    self.conn.commit()
+        return availableTables
+
+    def cnangeUser(self, conn):
         try:
             self.conn.close()
             self.c.close()
         except:
-            pass
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAA")
         self.conn = conn
         self.c = self.conn.cursor()
-
-    def getAvailableTables(self):
-        availableTables = []
-        for table in self.tables:
-            try:
-                self.c.execute("SELECT * from \"{}\"".format(table))
-                records = self.c.fetchall()
-                availableTables.append(table)
-            except Exception as e:
-                print(e)
-        return availableTables
 
 
 def kill():
@@ -330,10 +368,12 @@ if __name__ == "__main__":
     root.mainloop()
     assert connectionFlag, kill()
     db = DB(conn)  # экземпляр класса DB
+    # print(db.getAvailableTables())
     root = tk.Tk()  # корневое окно программы
     app = Main(root)
     app.pack()
     root.title("Pizzas")  # название окна
-    root.geometry("650x450+300+200")  # размеры окна
+    root.geometry("1000x450+300+200")  # размеры окна
     # root.resizable(False, False)  # фиксация окна по обоим осям
     root.mainloop()  # запуск главного цикла обработки событий
+    db.conn.close()
