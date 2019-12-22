@@ -54,10 +54,10 @@ class Main(tk.Frame):
                                      compound=tk.TOP, command=self.showDb)
         self.buttonSerch.pack(side=tk.RIGHT)
 
-        self.deleteImg = tk.PhotoImage(file='delete.png')
-        self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
-                                      compound=tk.TOP, command=self.deleteRecord)
-        self.buttonDelete.pack(side=tk.RIGHT)
+        # self.deleteImg = tk.PhotoImage(file='delete.png')
+        # self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
+        #                               compound=tk.TOP, command=self.deleteRecord)
+        # self.buttonDelete.pack(side=tk.RIGHT)
 
     def deleteRecord(self):
         messagebox.showwarning("Удалять записи может только админ",
@@ -104,13 +104,50 @@ class Main(tk.Frame):
         except:
             pass
         if self.currentTable == "employees":
-            tables = [" ID ", "ID пиццерии", "Фамилия", "  Имя  ", "Отчество",
-                      "Дата рождения", "Должность", "Адрес", "Позиция"]
+            tables = [" ID ", "Номер пиццерии", "Фамилия", "  Имя  ", "Отчество",
+                      "Дата рождения", "Количество рабочих часов", "Адрес", "Должность"]
             self.tree = ttk.Treeview(self, height=25, show='headings', columns=tables)
             [self.tree.column(table, width=table.__len__() * 10, anchor=tk.CENTER) for table in tables]
             [self.tree.heading(table, text=table) for table in tables]
             self.tree.pack()
         [self.tree.insert('', 'end', values=row) for row in records]
+        if self.currentTable == "address":
+            tables = ["ID", "Город", "Улица", "Номер дома", "Корпус", "Строение", "Номер квартиры/офиса"]
+
+        if self.currentTable == "dish":
+            tables = ["ID", "Название", "Цена", "Вес"]
+
+        if self.currentTable == "dish_ingredients":
+            tables = ["ID", "Номер блюда", "Ингредиент", "Количество в блюде", "Единицы измерения"]
+
+        if self.currentTable == "dish_orders":
+            tables = ["ID", "Номер блюда", "Номер заказа"]
+
+        if self.currentTable == "ingredients":
+            tables = ["ID", "Название", "Калорийность", "Белки", "Жиры", "Углеводы",
+                      "Количество на складе", "Единицы измения"]
+
+        if self.currentTable == "menu":
+            tables = ["ID", "Номер пиццерии", "Блюдо", "Наличие"]
+
+        if self.currentTable == "orders":
+            tables = ["Номер заказа", "Номер пиццерии", "Сотрудник", "Время закрытия заказа", "Цена", "Дата"]
+
+        if self.currentTable == "passport":
+            tables = ["Серия", "Номер", "Владелец", "Место выдачи", "Дата выдачи"]
+
+        if self.currentTable == "pizzeria":
+            tables = ["Номер", "Адрес", "Время начала работы", "Время окончания работы"]
+        if self.currentTable == "positions":
+            tables = ["ID", "Должность", "Зарплата"]
+        if self.currentTable == "producer":
+            tables = ["Номер договора", "Цена", "Продукт"]
+        if self.currentTable == "tables":
+            tables = ["Номер стола", "Номер пиццерии", "Занятость", "Время начала резерва", "Время окончания резерва"]
+        if self.currentTable == "units":
+            tables = ["ID", "Название"]
+        if self.currentTable == "warehouse":
+            tables = ["ID", "Номер пиццерии", "Производитель"]
 
     # def records(self, description, costs, total):
     #     self.db.insert_data(description, costs, total)
