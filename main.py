@@ -377,15 +377,15 @@ class AddRecord:
         date = datetime.date(year=int(sqlFilter(self.v4f.get()).split(" ")[2]),
                              month=int(sqlFilter(self.v4f.get()).split(" ")[1]),
                              day=int(sqlFilter(self.v4f.get()).split(" ")[0]))
-        quota = sqlFilter(self.v5f.get())
+        quota = int(sqlFilter(self.v5f.get()))
         town = sqlFilter(self.v6f.get())
         street = sqlFilter(self.v7f.get())
-        houseNumber = sqlFilter(self.v8f.get())
-        structure = False if sqlFilter(self.v9f.get()) == "" else sqlFilter(self.v9f.get())
-        housing = False if sqlFilter(self.v10f.get()) == "" else sqlFilter(self.v10f.get())
-        apart = sqlFilter(self.v11f.get())
+        houseNumber = int(sqlFilter(self.v8f.get()))
+        structure = False if sqlFilter(self.v9f.get()) == "" else int(sqlFilter(self.v9f.get()))
+        housing = False if sqlFilter(self.v10f.get()) == "" else int(sqlFilter(self.v10f.get()))
+        apart = int(sqlFilter(self.v11f.get()))
         position = sqlFilter(self.v12f.get())
-        salary = sqlFilter(self.v13f.get())
+        salary = int(sqlFilter(self.v13f.get()))
         password = hashFunc(sqlFilter(self.v14f.get()))
 
         if app.currentTable == "employees":
@@ -393,8 +393,8 @@ class AddRecord:
                 cur = db.conn.cursor()
                 if structure and housing:
                     cur.execute(
-                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
-                        \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\');""".format(
+                        """select * from register_employee(\'{}\',\'{}\',\'{}\',\'{}\',{},\'{}\',\'{}\',{},
+                        {},{},{},\'{}\',{},\'{}\');""".format(
                             name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
                             apart, position, salary, password
                         ))
