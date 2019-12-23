@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import sys
 import time
@@ -29,20 +30,26 @@ class Main(tk.Frame):
         # btn_open_dialog.pack(side=tk.LEFT)
         #
         self.availableTables = db.getAvailableTables()
+
         self.currentUserImg = tk.PhotoImage(file='user.gif')
         self.buttonCurrentUser = tk.Button(self.toolbar, text="Текущий пользователь: " + currentUser, bg='#d7d8e0',
                                            bd=0, image=self.currentUserImg, compound=tk.TOP, command=self.Pass)
-
         self.buttonCurrentUser.pack(side=tk.LEFT)
+
         self.changeUserImg = tk.PhotoImage(file='update.gif')
         self.buttonChangeUser = tk.Button(self.toolbar, text="Сменить пользователя", bg='#d7d8e0', bd=0,
                                           image=self.changeUserImg, compound=tk.TOP, command=self.changeUser)
-
         self.buttonChangeUser.pack(side=tk.LEFT)
+
         self.refreshImg = tk.PhotoImage(file='refresh.png')
         self.buttonRefresh = tk.Button(self.toolbar, text='Обновить', bg='#d7d8e0', bd=0, image=self.refreshImg,
                                        compound=tk.TOP, command=self.refresh)
         self.buttonRefresh.pack(side=tk.LEFT)
+
+        self.saveImg = tk.PhotoImage(file='save.png')
+        self.buttonSave = tk.Button(self.toolbar, text='Сохранить', bg='#d7d8e0', bd=0, image=self.saveImg,
+                                    compound=tk.TOP, command=self.save)
+        self.buttonSave.pack(side=tk.LEFT)
 
         self.listBox = tk.Listbox(self.toolbar, height=5, width=16)
         for i in self.availableTables:
@@ -54,26 +61,57 @@ class Main(tk.Frame):
                                      compound=tk.TOP, command=self.showDb)
         self.buttonSerch.pack(side=tk.RIGHT)
 
+        self.addImg = tk.PhotoImage(file='plus.png')
+        self.buttonAdd = tk.Button(self.toolbar, text='Добавить', bg='#d7d8e0', bd=0, image=self.addImg,
+                                   compound=tk.TOP, command=self.addRecord)
+        self.buttonAdd.pack(side=tk.RIGHT)
+
         # self.deleteImg = tk.PhotoImage(file='delete.png')
         # self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
         #                               compound=tk.TOP, command=self.deleteRecord)
         # self.buttonDelete.pack(side=tk.RIGHT)
 
-    def deleteRecord(self):
-        messagebox.showwarning("Удалять записи может только админ",
-                               "Delete давать пользователям не безопасно\n Придётся делать защиту от дурачков")
+    def save(self):
         try:
-            recordIdToDelete = self.tree.selection()[0]
+            self.currentTable = self.availableTables[self.listBox.curselection()[0]]
         except:
             return
-        recordToDelete = self.tree.item(recordIdToDelete, "values")
-        with db.conn:
-            cur = db.conn.cursor()
-            cur.execute("DELETE from \"{}\" where private_number={}".format(self.currentTable, recordToDelete[0]))
-            db.conn.commit()
+        if self.currentTable == "employees":
+            tables = [" ID ", "Номер пиццерии", "Фамилия", "  Имя  ", "Отчество",
+                      "Дата рождения", "Количество рабочих часов", "Должность", "Адрес"]
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute("""select private_number, pizzeria_number, surname, name, patronymic, birth_date, 
+                                work_quota, positions.position_name, address.town, address.street, address.house_number, 
+                                address.structure, address.housing, address.apart_office from employees
+                                left join address ON address.address_number = employees.address
+                                left join positions on positions.position = employees.position
+                                order by private_number""")
+                records = cur.fetchall()
+                db.conn.commit()
+            newRecords = []
+            for i in [list(j) for j in records]:
+                tmp = i[0:8]
+                tmp.append(" ".join(list(filter(lambda x: x != "None", map(str, i[8:])))))
+                newRecords.append(tmp)
+            f = open("{}.csv".format(self.currentTable), "w+")
+            f.write(";".join(tables))
+            f.write("\n")
+            for rec in newRecords:
+                f.write(";".join(list(map(str, rec))))
+                f.write("\n")
+            f.close()
+
+    def deleteRecord(self):
+        messagebox.showwarning("Удалять записи может только админ",
+                               "Delete давать пользователям не безопасно\nПридётся делать защиту от дурачков")
+
+    def addRecord(self):
+        AddRecord()
 
     def changeUser(self):
         EmployeeAuthRefresh()
+        self.refresh()
 
     def refresh(self):
         self.buttonCurrentUser.configure(text="Текущий пользователь: " + currentUser)
@@ -83,7 +121,7 @@ class Main(tk.Frame):
         for i in self.availableTables:
             self.listBox.insert(tk.END, i)
         try:
-            currentTable = self.availableTables[self.listBox.curselection()[0]]
+            self.currentTable = self.availableTables[self.listBox.curselection()[0]]
         except:
             return
         self.showDb()
@@ -93,11 +131,6 @@ class Main(tk.Frame):
             self.currentTable = self.availableTables[self.listBox.curselection()[0]]
         except:
             return
-        with db.conn:
-            cur = db.conn.cursor()
-            cur.execute("SELECT * from \"{}\"".format(self.currentTable))
-            records = cur.fetchall()
-            db.conn.commit()
         try:
             self.tree.delete(*self.tree.get_children())
             self.tree.destroy()
@@ -105,12 +138,27 @@ class Main(tk.Frame):
             pass
         if self.currentTable == "employees":
             tables = [" ID ", "Номер пиццерии", "Фамилия", "  Имя  ", "Отчество",
-                      "Дата рождения", "Количество рабочих часов", "Адрес", "Должность"]
+                      "Дата рождения", "Количество рабочих часов", "Должность", "Адрес"]
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute("""select private_number, pizzeria_number, surname, name, patronymic, birth_date, 
+                                work_quota, positions.position_name, address.town, address.street, address.house_number, 
+                                address.structure, address.housing, address.apart_office from employees
+                                left join address ON address.address_number = employees.address
+                                left join positions on positions.position = employees.position
+                                order by private_number""")
+                records = cur.fetchall()
+                db.conn.commit()
+            newRecords = []
+            for i in [list(j) for j in records]:
+                tmp = i[0:8]
+                tmp.append(" ".join(list(filter(lambda x: x != "None", map(str, i[8:])))))
+                newRecords.append(tmp)
             self.tree = ttk.Treeview(self, height=25, show='headings', columns=tables)
             [self.tree.column(table, width=table.__len__() * 10, anchor=tk.CENTER) for table in tables]
             [self.tree.heading(table, text=table) for table in tables]
             self.tree.pack()
-        [self.tree.insert('', 'end', values=row) for row in records]
+        [self.tree.insert('', 'end', values=row) for row in newRecords]
         if self.currentTable == "address":
             tables = ["ID", "Город", "Улица", "Номер дома", "Корпус", "Строение", "Номер квартиры/офиса"]
 
@@ -230,6 +278,126 @@ class Main(tk.Frame):
 #                                                                           self.entry_money.get()))
 #
 #         self.btn_ok.destroy()
+
+class AddRecord:
+    def __init__(self):
+        self.window = tk.Toplevel(root)
+        self.v1 = tk.StringVar()
+        self.v2 = tk.StringVar()
+        self.v3 = tk.StringVar()
+        self.v4 = tk.StringVar()
+        self.v5 = tk.StringVar()
+        self.v6 = tk.StringVar()
+        self.v7 = tk.StringVar()
+        self.v8 = tk.StringVar()
+        self.v9 = tk.StringVar()
+        self.v10 = tk.StringVar()
+        self.v11 = tk.StringVar()
+        self.v12 = tk.StringVar()
+        self.v13 = tk.StringVar()
+        self.v14 = tk.StringVar()
+        self.initUI()
+
+    def initUI(self):
+        self.window.title("Добавить запись")
+        self.window.geometry("300x480")
+
+        tk.Label(self.window, text="Имя:").grid(row=0, column=0, sticky="w")
+        tk.Label(self.window, text="Фамилия:").grid(row=1, column=0, sticky="w")
+        tk.Label(self.window, text="Отчество:").grid(row=2, column=0, sticky="w")
+        tk.Label(self.window, text="Дата рождения:").grid(row=3, column=0, sticky="w")
+        tk.Label(self.window, text="Количество рабочих часов:").grid(row=4, column=0, sticky="w")
+        tk.Label(self.window, text="Город:").grid(row=5, column=0, sticky="w")
+        tk.Label(self.window, text="Улица:").grid(row=6, column=0, sticky="w")
+        tk.Label(self.window, text="Дом:").grid(row=7, column=0, sticky="w")
+        tk.Label(self.window, text="Корпус:").grid(row=8, column=0, sticky="w")
+        tk.Label(self.window, text="Строение:").grid(row=9, column=0, sticky="w")
+        tk.Label(self.window, text="Квартира:").grid(row=10, column=0, sticky="w")
+        tk.Label(self.window, text="Должность:").grid(row=11, column=0, sticky="w")
+        tk.Label(self.window, text="Зарплата:").grid(row=12, column=0, sticky="w")
+        tk.Label(self.window, text="Пароль:").grid(row=13, column=0, sticky="w")
+
+        self.v1f = tk.Entry(self.window, textvariable=self.v1)
+        self.v2f = tk.Entry(self.window, textvariable=self.v2)
+        self.v3f = tk.Entry(self.window, textvariable=self.v3)
+        self.v4f = tk.Entry(self.window, textvariable=self.v4)
+        self.v5f = tk.Entry(self.window, textvariable=self.v5)
+        self.v6f = tk.Entry(self.window, textvariable=self.v6)
+        self.v7f = tk.Entry(self.window, textvariable=self.v7)
+        self.v8f = tk.Entry(self.window, textvariable=self.v8)
+        self.v9f = tk.Entry(self.window, textvariable=self.v9)
+        self.v10f = tk.Entry(self.window, textvariable=self.v10)
+        self.v11f = tk.Entry(self.window, textvariable=self.v11)
+        self.v12f = tk.Entry(self.window, textvariable=self.v12)
+        self.v13f = tk.Entry(self.window, textvariable=self.v13)
+        self.v14f = tk.Entry(self.window, textvariable=self.v14)
+
+        self.v1f.insert(0, "павел")
+        self.v1f.grid(row=0, column=1, padx=5, pady=5)
+        self.v2f.insert(0, "пушкин")
+        self.v2f.grid(row=1, column=1, padx=5, pady=5)
+        self.v3f.insert(0, "колотушкин")
+        self.v3f.grid(row=2, column=1, padx=5, pady=5)
+        self.v4f.insert(0, "21 08 2000")
+        self.v4f.grid(row=3, column=1, padx=5, pady=5)
+        self.v5f.insert(0, "2")
+        self.v5f.grid(row=4, column=1, padx=5, pady=5)
+        self.v6f.insert(0, "москва")
+        self.v6f.grid(row=5, column=1, padx=5, pady=5)
+        self.v7f.insert(0, "такая")
+        self.v7f.grid(row=6, column=1, padx=5, pady=5)
+        self.v8f.insert(0, "2")
+        self.v8f.grid(row=7, column=1, padx=5, pady=5)
+        self.v9f.insert(0, "1")
+        self.v9f.grid(row=8, column=1, padx=5, pady=5)
+        self.v10f.insert(0, "")
+        self.v10f.grid(row=9, column=1, padx=5, pady=5)
+        self.v11f.insert(0, "234")
+        self.v11f.grid(row=10, column=1, padx=5, pady=5)
+        self.v12f.insert(0, "никто")
+        self.v12f.grid(row=11, column=1, padx=5, pady=5)
+        self.v13f.insert(0, "99999")
+        self.v13f.grid(row=12, column=1, padx=5, pady=5)
+        self.v14f.insert(0, "1234")
+        self.v14f.grid(row=13, column=1, padx=5, pady=5)
+
+        tk.Button(self.window,
+                  text="Добавить",
+                  background="#555",
+                  foreground="#ccc",
+                  padx="10",
+                  pady="6",
+                  command=self.click
+                  ).grid(row=14, column=1, padx=0, pady=20)
+
+    def click(self):
+        name = sqlFilter(self.v1f.get())
+        surname = sqlFilter(self.v2f.get())
+        patronic = sqlFilter(self.v3f.get())
+        date = datetime.date(year=int(sqlFilter(self.v4f.get()).split(" ")[2]),
+                             month=int(sqlFilter(self.v4f.get()).split(" ")[1]),
+                             day=int(sqlFilter(self.v4f.get()).split(" ")[0]))
+        quota = sqlFilter(self.v5f.get())
+        town = sqlFilter(self.v6f.get())
+        street = sqlFilter(self.v7f.get())
+        houseNumber = sqlFilter(self.v8f.get())
+        structure = None if sqlFilter(self.v9f.get()) == "" else sqlFilter(self.v9f.get())
+        housing = None if sqlFilter(self.v10f.get()) == "" else sqlFilter(self.v10f.get())
+        apart = sqlFilter(self.v11f.get())
+        position = sqlFilter(self.v12f.get())
+        salary = sqlFilter(self.v13f.get())
+        password = hashFunc(sqlFilter(self.v14f.get()))
+
+        if app.currentTable == "employees":
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute(
+                    """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
+                        \'{}\',\'{}\',\'{}\',\'{}\',\'{}\');""".format(
+                        name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
+                        apart, position, salary, password
+                    ))
+                db.conn.commit()
 
 
 def hashFunc(s):
@@ -405,7 +573,6 @@ if __name__ == "__main__":
     root.mainloop()
     assert connectionFlag, kill()
     db = DB(conn)  # экземпляр класса DB
-    # print(db.getAvailableTables())
     root = tk.Tk()  # корневое окно программы
     app = Main(root)
     app.pack()
