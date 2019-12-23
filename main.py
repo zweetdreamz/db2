@@ -381,8 +381,8 @@ class AddRecord:
         town = sqlFilter(self.v6f.get())
         street = sqlFilter(self.v7f.get())
         houseNumber = sqlFilter(self.v8f.get())
-        structure = None if sqlFilter(self.v9f.get()) == "" else sqlFilter(self.v9f.get())
-        housing = None if sqlFilter(self.v10f.get()) == "" else sqlFilter(self.v10f.get())
+        structure = False if sqlFilter(self.v9f.get()) == "" else sqlFilter(self.v9f.get())
+        housing = False if sqlFilter(self.v10f.get()) == "" else sqlFilter(self.v10f.get())
         apart = sqlFilter(self.v11f.get())
         position = sqlFilter(self.v12f.get())
         salary = sqlFilter(self.v13f.get())
@@ -391,12 +391,34 @@ class AddRecord:
         if app.currentTable == "employees":
             with db.conn:
                 cur = db.conn.cursor()
-                cur.execute(
-                    """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
+                if structure and housing:
+                    cur.execute(
+                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
+                        \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\');""".format(
+                            name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
+                            apart, position, salary, password
+                        ))
+                elif not structure and not housing:
+                    cur.execute(
+                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',,,
+                        \'{}\',\'{}\',\'{}\',\'{}\');""".format(
+                            name, surname, patronic, date, quota, town, street, houseNumber, apart, position, salary,
+                            password
+                        ))
+                elif not structure and housing:
+                    cur.execute(
+                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',,
                         \'{}\',\'{}\',\'{}\',\'{}\',\'{}\');""".format(
-                        name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
-                        apart, position, salary, password
-                    ))
+                            name, surname, patronic, date, quota, town, street, houseNumber, housing,
+                            apart, position, salary, password
+                        ))
+                elif structure and not housing:
+                    cur.execute(
+                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
+                        \'{}\',,\'{}\',\'{}\',\'{}\',\'{}\');""".format(
+                            name, surname, patronic, date, quota, town, street, houseNumber, structure,
+                            apart, position, salary, password
+                        ))
                 db.conn.commit()
 
 
