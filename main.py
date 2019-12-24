@@ -8,6 +8,25 @@ from tkinter import ttk, messagebox  # импорт модуля TTk
 import psycopg2  # импорт модуля бд
 
 
+def hashFunc(s):
+    return hashlib.sha3_256(s.encode()).hexdigest()
+
+
+def sqlFilter(s):
+    bads = ["/", "\\", "|", "=", ">", "<", "CREATE", "SELECT", "FROM", "ALL", "*", "!",
+            "ALL", "ANY", "BETWEEN", "IN", "LIKE", "OR", "SOME", "(", ")", "&", "^", "%",
+            "+", "~", "DROP", "DATEBASE", "KEY", "PRIMARY", "FOREIGN", "null", "DELETE",
+            "SET", "DISTINCT", "GROUP BY", ";"]
+    for i in bads:
+        s = s.replace(i, "").replace(i.lower(), "").replace(i.title(), "")
+    return s.strip()
+
+
+hostnameIP = '157.230.19.140'
+dbName = "cousedb"
+port = "5432"
+
+
 class Main(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
@@ -66,10 +85,10 @@ class Main(tk.Frame):
                                    compound=tk.TOP, command=self.addRecord)
         self.buttonAdd.pack(side=tk.RIGHT)
 
-        # self.deleteImg = tk.PhotoImage(file='delete.png')
-        # self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
-        #                               compound=tk.TOP, command=self.deleteRecord)
-        # self.buttonDelete.pack(side=tk.RIGHT)
+        self.deleteImg = tk.PhotoImage(file='delete.png')
+        self.buttonDelete = tk.Button(self.toolbar, text='Удалить', bg='#d7d8e0', bd=0, image=self.deleteImg,
+                                      compound=tk.TOP, command=self.deleteRecord)
+        self.buttonDelete.pack(side=tk.RIGHT)
 
     def save(self):
         try:
@@ -101,7 +120,28 @@ class Main(tk.Frame):
                 f.write(";".join(list(map(str, rec))))
                 f.write("\n")
             f.close()
+        if self.currentTable == "orders":
+            tables = ["Номер заказа", "Номер пиццерии", "Имя сотрудника", "Фамилия сотрудника", "Время заказа",
+                      "Дата заказа", "Стоимость", "Название блюда"]
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute("""select orders.order_number, orders.pizzeria_number, employees.name, employees.surname, 
+                                closing_time, orders.date, orders.price, dish.dish_name from orders
+                                left join employees on employees.private_number = orders.employee
+                                left join dish_orders on dish_orders.order_number = orders.order_number
+                                left join dish on dish_orders.dish_number = dish.dish_number""")
+                records = cur.fetchall()
+                db.conn.commit()
+                f = open("{}.csv".format(self.currentTable), "w+")
+                f.write(";".join(tables))
+                f.write("\n")
+                summ = sum([i[-2] for i in records])
+                for rec in records:
+                    f.write(";".join(list(map(str, rec))))
+                    f.write("\n")
 
+                f.write(";;;;;Общая Сумма;{}".format(summ))
+                f.close()
     def deleteRecord(self):
         messagebox.showwarning("Удалять записи может только админ",
                                "Delete давать пользователям не безопасно\nПридётся делать защиту от дурачков")
@@ -120,10 +160,6 @@ class Main(tk.Frame):
         self.availableTables = db.getAvailableTables()
         for i in self.availableTables:
             self.listBox.insert(tk.END, i)
-        try:
-            self.currentTable = self.availableTables[self.listBox.curselection()[0]]
-        except:
-            return
         self.showDb()
 
     def showDb(self):
@@ -155,10 +191,10 @@ class Main(tk.Frame):
                 tmp.append(" ".join(list(filter(lambda x: x != "None", map(str, i[8:])))))
                 newRecords.append(tmp)
             self.tree = ttk.Treeview(self, height=25, show='headings', columns=tables)
-            [self.tree.column(table, width=table.__len__() * 10, anchor=tk.CENTER) for table in tables]
+            [self.tree.column(table, width=table.__len__() * 8, anchor=tk.CENTER) for table in tables]
             [self.tree.heading(table, text=table) for table in tables]
             self.tree.pack()
-        [self.tree.insert('', 'end', values=row) for row in newRecords]
+            [self.tree.insert('', 'end', values=row) for row in newRecords]
         if self.currentTable == "address":
             tables = ["ID", "Город", "Улица", "Номер дома", "Корпус", "Строение", "Номер квартиры/офиса"]
 
@@ -179,7 +215,23 @@ class Main(tk.Frame):
             tables = ["ID", "Номер пиццерии", "Блюдо", "Наличие"]
 
         if self.currentTable == "orders":
-            tables = ["Номер заказа", "Номер пиццерии", "Сотрудник", "Время закрытия заказа", "Цена", "Дата"]
+            tables = ["Номер заказа", "Номер пиццерии", "Имя сотрудника", "Фамилия сотрудника", "Время заказа",
+                      "Дата заказа", "Стоимость", "Название блюда"]
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute("""select orders.order_number, orders.pizzeria_number, employees.name, employees.surname, 
+                                closing_time, orders.date, orders.price, dish.dish_name from orders
+                                left join employees on employees.private_number = orders.employee
+                                left join dish_orders on dish_orders.order_number = orders.order_number
+                                left join dish on dish_orders.dish_number = dish.dish_number""")
+                records = cur.fetchall()
+                db.conn.commit()
+            newRecords = []
+            self.tree = ttk.Treeview(self, height=25, show='headings', columns=tables)
+            [self.tree.column(table, width=table.__len__() * 10, anchor=tk.CENTER) for table in tables]
+            [self.tree.heading(table, text=table) for table in tables]
+            self.tree.pack()
+            [self.tree.insert('', 'end', values=row) for row in records]
 
         if self.currentTable == "passport":
             tables = ["Серия", "Номер", "Владелец", "Место выдачи", "Дата выдачи"]
@@ -197,87 +249,6 @@ class Main(tk.Frame):
         if self.currentTable == "warehouse":
             tables = ["ID", "Номер пиццерии", "Производитель"]
 
-    # def records(self, description, costs, total):
-    #     self.db.insert_data(description, costs, total)
-    #     self.view_records()
-    #
-    # def update_record(self, description, costs, total):
-    #     self.db.c.execute('''UPDATE finance SET description=?, costs=?, total=? WHERE ID=?''',
-    #                       (description, costs, total, self.tree.set(self.tree.selection()[0], '#1')))
-    #     self.db.conn.commit()
-    #     self.view_records()
-    #
-    # def view_records(self):
-    #     self.db.c.execute('''SELECT * FROM finance''')
-    #     [self.tree.delete(i) for i in self.tree.get_children()]
-    #     [self.tree.insert('', 'end', values=row) for row in self.db.c.fetchall()]
-    #
-    # def search(self):
-    #     self.db.c.execute('''''')
-    #
-    # def delete_all_records(self):
-    #     self.db.c.execute('''DELETE FROM finance''')
-    #     self.db.conn.commit()
-    #     self.view_records()
-
-
-#
-# class Child(tk.Toplevel):
-#     def __init__(self):
-#         super().__init__(root)
-#         self.init_child()
-#         self.view = app
-#
-#     def init_child(self):
-#         self.title('Добавить доходы/расходы')
-#         self.geometry('400x220+400+300')
-#         self.resizable(False, False)
-#
-#         label_description = tk.Label(self, text='Наименование:')
-#         label_description.place(x=50, y=50)
-#         label_select = tk.Label(self, text='Статья дохода/расхода:')
-#         label_select.place(x=50, y=80)
-#         label_sum = tk.Label(self, text='Сумма:')
-#         label_sum.place(x=50, y=110)
-#
-#         self.entry_description = ttk.Entry(self)
-#         self.entry_description.place(x=200, y=50)
-#
-#         self.entry_money = ttk.Entry(self)
-#         self.entry_money.place(x=200, y=110)
-#
-#         self.combobox = ttk.Combobox(self, values=[u'Доход', u'Расход'])
-#         self.combobox.current(0)
-#         self.combobox.place(x=200, y=80)
-#
-#         btn_cancel = ttk.Button(self, text='Закрыть', command=self.destroy)
-#         btn_cancel.place(x=300, y=170)
-#
-#         self.btn_ok = ttk.Button(self, text='Добавить')
-#         self.btn_ok.place(x=220, y=170)
-#         self.btn_ok.bind('<Button-1>', lambda event: self.view.records(self.entry_description.get(),
-#                                                                        self.combobox.get(),
-#                                                                        self.entry_money.get()))
-#
-#         self.grab_set()  # перехват всех событий, происходящих в приложении
-#         self.focus_set()  # захват и удержание фокуса
-#
-#
-# class Update(Child):
-#     def __init__(self):
-#         super().__init__()
-#         self.init_edit()
-#         self.view = app
-#
-#     def init_edit(self):
-#         self.title('Редактировать позицию')
-#         btn_edit = ttk.Button(self, text='Редактировать')
-#         btn_edit.place(x=205, y=170)
-#         btn_edit.bind('<Button-1>', lambda event: self.view.update_record(self.entry_description.get(),
-#                                                                           self.combobox.get(),
-#                                                                           self.entry_money.get()))
-#
-#         self.btn_ok.destroy()
 
 class AddRecord:
     def __init__(self):
@@ -299,67 +270,100 @@ class AddRecord:
         self.initUI()
 
     def initUI(self):
-        self.window.title("Добавить запись")
-        self.window.geometry("300x480")
+        if app.currentTable == "employees":
+            self.window.title("Добавить запись")
+            self.window.geometry("300x480")
 
-        tk.Label(self.window, text="Имя:").grid(row=0, column=0, sticky="w")
-        tk.Label(self.window, text="Фамилия:").grid(row=1, column=0, sticky="w")
-        tk.Label(self.window, text="Отчество:").grid(row=2, column=0, sticky="w")
-        tk.Label(self.window, text="Дата рождения:").grid(row=3, column=0, sticky="w")
-        tk.Label(self.window, text="Количество рабочих часов:").grid(row=4, column=0, sticky="w")
-        tk.Label(self.window, text="Город:").grid(row=5, column=0, sticky="w")
-        tk.Label(self.window, text="Улица:").grid(row=6, column=0, sticky="w")
-        tk.Label(self.window, text="Дом:").grid(row=7, column=0, sticky="w")
-        tk.Label(self.window, text="Корпус:").grid(row=8, column=0, sticky="w")
-        tk.Label(self.window, text="Строение:").grid(row=9, column=0, sticky="w")
-        tk.Label(self.window, text="Квартира:").grid(row=10, column=0, sticky="w")
-        tk.Label(self.window, text="Должность:").grid(row=11, column=0, sticky="w")
-        tk.Label(self.window, text="Зарплата:").grid(row=12, column=0, sticky="w")
-        tk.Label(self.window, text="Пароль:").grid(row=13, column=0, sticky="w")
+            tk.Label(self.window, text="Имя:").grid(row=0, column=0, sticky="w")
+            tk.Label(self.window, text="Фамилия:").grid(row=1, column=0, sticky="w")
+            tk.Label(self.window, text="Отчество:").grid(row=2, column=0, sticky="w")
+            tk.Label(self.window, text="Дата рождения:").grid(row=3, column=0, sticky="w")
+            tk.Label(self.window, text="Количество рабочих часов:").grid(row=4, column=0, sticky="w")
+            tk.Label(self.window, text="Город:").grid(row=5, column=0, sticky="w")
+            tk.Label(self.window, text="Улица:").grid(row=6, column=0, sticky="w")
+            tk.Label(self.window, text="Дом:").grid(row=7, column=0, sticky="w")
+            tk.Label(self.window, text="Корпус:").grid(row=8, column=0, sticky="w")
+            tk.Label(self.window, text="Строение:").grid(row=9, column=0, sticky="w")
+            tk.Label(self.window, text="Квартира:").grid(row=10, column=0, sticky="w")
+            tk.Label(self.window, text="Должность:").grid(row=11, column=0, sticky="w")
+            tk.Label(self.window, text="Зарплата:").grid(row=12, column=0, sticky="w")
+            tk.Label(self.window, text="Пароль:").grid(row=13, column=0, sticky="w")
 
-        self.v1f = tk.Entry(self.window, textvariable=self.v1)
-        self.v2f = tk.Entry(self.window, textvariable=self.v2)
-        self.v3f = tk.Entry(self.window, textvariable=self.v3)
-        self.v4f = tk.Entry(self.window, textvariable=self.v4)
-        self.v5f = tk.Entry(self.window, textvariable=self.v5)
-        self.v6f = tk.Entry(self.window, textvariable=self.v6)
-        self.v7f = tk.Entry(self.window, textvariable=self.v7)
-        self.v8f = tk.Entry(self.window, textvariable=self.v8)
-        self.v9f = tk.Entry(self.window, textvariable=self.v9)
-        self.v10f = tk.Entry(self.window, textvariable=self.v10)
-        self.v11f = tk.Entry(self.window, textvariable=self.v11)
-        self.v12f = tk.Entry(self.window, textvariable=self.v12)
-        self.v13f = tk.Entry(self.window, textvariable=self.v13)
-        self.v14f = tk.Entry(self.window, textvariable=self.v14)
+            self.v1f = tk.Entry(self.window, textvariable=self.v1)
+            self.v2f = tk.Entry(self.window, textvariable=self.v2)
+            self.v3f = tk.Entry(self.window, textvariable=self.v3)
+            self.v4f = tk.Entry(self.window, textvariable=self.v4)
+            self.v5f = tk.Entry(self.window, textvariable=self.v5)
+            self.v6f = tk.Entry(self.window, textvariable=self.v6)
+            self.v7f = tk.Entry(self.window, textvariable=self.v7)
+            self.v8f = tk.Entry(self.window, textvariable=self.v8)
+            self.v9f = tk.Entry(self.window, textvariable=self.v9)
+            self.v10f = tk.Entry(self.window, textvariable=self.v10)
+            self.v11f = tk.Entry(self.window, textvariable=self.v11)
+            self.v12f = tk.Entry(self.window, textvariable=self.v12)
+            self.v13f = tk.Entry(self.window, textvariable=self.v13)
+            self.v14f = tk.Entry(self.window, textvariable=self.v14)
 
-        self.v1f.insert(0, "павел")
-        self.v1f.grid(row=0, column=1, padx=5, pady=5)
-        self.v2f.insert(0, "пушкин")
-        self.v2f.grid(row=1, column=1, padx=5, pady=5)
-        self.v3f.insert(0, "колотушкин")
-        self.v3f.grid(row=2, column=1, padx=5, pady=5)
-        self.v4f.insert(0, "21 08 2000")
-        self.v4f.grid(row=3, column=1, padx=5, pady=5)
-        self.v5f.insert(0, "2")
-        self.v5f.grid(row=4, column=1, padx=5, pady=5)
-        self.v6f.insert(0, "москва")
-        self.v6f.grid(row=5, column=1, padx=5, pady=5)
-        self.v7f.insert(0, "такая")
-        self.v7f.grid(row=6, column=1, padx=5, pady=5)
-        self.v8f.insert(0, "2")
-        self.v8f.grid(row=7, column=1, padx=5, pady=5)
-        self.v9f.insert(0, "1")
-        self.v9f.grid(row=8, column=1, padx=5, pady=5)
-        self.v10f.insert(0, "")
-        self.v10f.grid(row=9, column=1, padx=5, pady=5)
-        self.v11f.insert(0, "234")
-        self.v11f.grid(row=10, column=1, padx=5, pady=5)
-        self.v12f.insert(0, "никто")
-        self.v12f.grid(row=11, column=1, padx=5, pady=5)
-        self.v13f.insert(0, "99999")
-        self.v13f.grid(row=12, column=1, padx=5, pady=5)
-        self.v14f.insert(0, "1234")
-        self.v14f.grid(row=13, column=1, padx=5, pady=5)
+            self.v1f.insert(0, "")
+            self.v1f.grid(row=0, column=1, padx=5, pady=5)
+            self.v2f.insert(0, "")
+            self.v2f.grid(row=1, column=1, padx=5, pady=5)
+            self.v3f.insert(0, "")
+            self.v3f.grid(row=2, column=1, padx=5, pady=5)
+            self.v4f.insert(0, "")
+            self.v4f.grid(row=3, column=1, padx=5, pady=5)
+            self.v5f.insert(0, "")
+            self.v5f.grid(row=4, column=1, padx=5, pady=5)
+            self.v6f.insert(0, "")
+            self.v6f.grid(row=5, column=1, padx=5, pady=5)
+            self.v7f.insert(0, "")
+            self.v7f.grid(row=6, column=1, padx=5, pady=5)
+            self.v8f.insert(0, "")
+            self.v8f.grid(row=7, column=1, padx=5, pady=5)
+            self.v9f.insert(0, "")
+            self.v9f.grid(row=8, column=1, padx=5, pady=5)
+            self.v10f.insert(0, "")
+            self.v10f.grid(row=9, column=1, padx=5, pady=5)
+            self.v11f.insert(0, "")
+            self.v11f.grid(row=10, column=1, padx=5, pady=5)
+            self.v12f.insert(0, "")
+            self.v12f.grid(row=11, column=1, padx=5, pady=5)
+            self.v13f.insert(0, "")
+            self.v13f.grid(row=12, column=1, padx=5, pady=5)
+            self.v14f.insert(0, "")
+            self.v14f.grid(row=13, column=1, padx=5, pady=5)
+
+        if app.currentTable == "orders":
+            self.window.title("Добавить запись")
+            self.window.geometry("250x260")
+
+            tk.Label(self.window, text="Номер пиццерии:").grid(row=0, column=0, sticky="w")
+            tk.Label(self.window, text="Номер сотрудника:").grid(row=1, column=0, sticky="w")
+            tk.Label(self.window, text="Время:").grid(row=2, column=0, sticky="w")
+            tk.Label(self.window, text="Цена:").grid(row=3, column=0, sticky="w")
+            tk.Label(self.window, text="Дата:").grid(row=4, column=0, sticky="w")
+            tk.Label(self.window, text="Номер блюда:").grid(row=5, column=0, sticky="w")
+
+            self.v1f = tk.Entry(self.window, textvariable=self.v1)
+            self.v2f = tk.Entry(self.window, textvariable=self.v2)
+            self.v3f = tk.Entry(self.window, textvariable=self.v3)
+            self.v4f = tk.Entry(self.window, textvariable=self.v4)
+            self.v5f = tk.Entry(self.window, textvariable=self.v5)
+            self.v6f = tk.Entry(self.window, textvariable=self.v6)
+
+            self.v1f.insert(0, "1")
+            self.v1f.grid(row=0, column=1, padx=5, pady=5)
+            self.v2f.insert(0, "1")
+            self.v2f.grid(row=1, column=1, padx=5, pady=5)
+            self.v3f.insert(0, datetime.datetime.now().__str__().split(" ")[1].split(".")[0])
+            self.v3f.grid(row=2, column=1, padx=5, pady=5)
+            self.v4f.insert(0, "650")
+            self.v4f.grid(row=3, column=1, padx=5, pady=5)
+            self.v5f.insert(0, datetime.date.today().__str__())
+            self.v5f.grid(row=4, column=1, padx=5, pady=5)
+            self.v6f.insert(0, "4")
+            self.v6f.grid(row=5, column=1, padx=5, pady=5)
+
 
         tk.Button(self.window,
                   text="Добавить",
@@ -368,77 +372,145 @@ class AddRecord:
                   padx="10",
                   pady="6",
                   command=self.click
-                  ).grid(row=14, column=1, padx=0, pady=20)
+                  ).grid(row=6, column=1, padx=0, pady=20)
 
     def click(self):
-        name = sqlFilter(self.v1f.get())
-        surname = sqlFilter(self.v2f.get())
-        patronic = sqlFilter(self.v3f.get())
-        date = datetime.date(year=int(sqlFilter(self.v4f.get()).split(" ")[2]),
-                             month=int(sqlFilter(self.v4f.get()).split(" ")[1]),
-                             day=int(sqlFilter(self.v4f.get()).split(" ")[0]))
-        quota = int(sqlFilter(self.v5f.get()))
-        town = sqlFilter(self.v6f.get())
-        street = sqlFilter(self.v7f.get())
-        houseNumber = int(sqlFilter(self.v8f.get()))
-        structure = False if sqlFilter(self.v9f.get()) == "" else int(sqlFilter(self.v9f.get()))
-        housing = False if sqlFilter(self.v10f.get()) == "" else int(sqlFilter(self.v10f.get()))
-        apart = int(sqlFilter(self.v11f.get()))
-        position = sqlFilter(self.v12f.get())
-        salary = int(sqlFilter(self.v13f.get()))
-        password = hashFunc(sqlFilter(self.v14f.get()))
+        if app.currentTable == "orders":
+            pizzNum = sqlFilter(self.v1f.get())
+            empNum = sqlFilter(self.v2f.get())
+            time = sqlFilter(self.v3f.get())
+            price = sqlFilter(self.v4f.get())
+            date = datetime.date(year=int(sqlFilter(self.v5f.get()).split("-")[0]),
+                                 month=int(sqlFilter(self.v5f.get()).split("-")[1]),
+                                 day=int(sqlFilter(self.v5f.get()).split("-")[2]))
+            dishNum = sqlFilter(self.v6f.get())
+            with db.conn:
+                cur = db.conn.cursor()
+                cur.execute("""select * from add_order(
+                                                        {}::integer,
+                                                        {}::integer,
+                                                        '{}'::time,
+                                                        {}::integer,
+                                                        '{}'::date,
+                                                        {}::integer
+                                                        );
+                                                         """.format(
+                    pizzNum, empNum, time, price, date, dishNum
+                ))
+                db.conn.commit()
 
         if app.currentTable == "employees":
+            name = sqlFilter(self.v1f.get())
+            surname = sqlFilter(self.v2f.get())
+            patronic = sqlFilter(self.v3f.get())
+            date = datetime.date(year=int(sqlFilter(self.v4f.get()).split(" ")[2]),
+                                 month=int(sqlFilter(self.v4f.get()).split(" ")[1]),
+                                 day=int(sqlFilter(self.v4f.get()).split(" ")[0]))
+            quota = int(sqlFilter(self.v5f.get()))
+            town = sqlFilter(self.v6f.get())
+            street = sqlFilter(self.v7f.get())
+            houseNumber = int(sqlFilter(self.v8f.get()))
+            structure = False if sqlFilter(self.v9f.get()) == "" else int(sqlFilter(self.v9f.get()))
+            housing = False if sqlFilter(self.v10f.get()) == "" else int(sqlFilter(self.v10f.get()))
+            apart = int(sqlFilter(self.v11f.get()))
+            position = sqlFilter(self.v12f.get())
+            salary = int(sqlFilter(self.v13f.get()))
+            password = hashFunc(sqlFilter(self.v14f.get()))
+
             with db.conn:
                 cur = db.conn.cursor()
                 if structure and housing:
-                    cur.execute(
-                        """select * from register_employee(\'{}\',\'{}\',\'{}\',\'{}\',{},\'{}\',\'{}\',{},
-                        {},{},{},\'{}\',{},\'{}\');""".format(
-                            name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
-                            apart, position, salary, password
-                        ))
+                    cur.execute("""select * from register_employee(
+                                                    1::integer,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::date,
+                                                    {}::integer ,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    {}::integer,
+                                                    {}::integer,
+                                                    {}::integer,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    '{}'::varchar
+                                                    );
+                                                     """.format(
+                        name, surname, patronic, date, quota, town, street, houseNumber, structure, housing,
+                        apart, position, salary, password
+                    ))
+                    db.conn.commit()
                 elif not structure and not housing:
-                    cur.execute(
-                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',,,
-                        \'{}\',\'{}\',\'{}\',\'{}\');""".format(
-                            name, surname, patronic, date, quota, town, street, houseNumber, apart, position, salary,
-                            password
-                        ))
+                    cur.execute("""select * from register_employee(
+                                                    1::integer,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::date,
+                                                    {}::integer ,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    NULL,
+                                                    NULL,
+                                                    {}::integer,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    '{}'::varchar
+                                                    );
+                                                     """.format(
+                        name, surname, patronic, date, quota, town, street, houseNumber,
+                        apart, position, salary, password
+                    ))
+                    db.conn.commit()
                 elif not structure and housing:
-                    cur.execute(
-                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',,
-                        \'{}\',\'{}\',\'{}\',\'{}\',\'{}\');""".format(
-                            name, surname, patronic, date, quota, town, street, houseNumber, housing,
-                            apart, position, salary, password
-                        ))
+                    cur.execute("""select * from register_employee(
+                                                    1::integer,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::date,
+                                                    {}::integer ,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    NULL,
+                                                    {}::integer,
+                                                    {}::integer,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    '{}'::varchar
+                                                    );
+                                                     """.format(
+                        name, surname, patronic, date, quota, town, street, houseNumber, housing,
+                        apart, position, salary, password
+                    ))
+                    db.conn.commit()
                 elif structure and not housing:
-                    cur.execute(
-                        """select * from register_employee(11, \'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',\'{}\',
-                        \'{}\',,\'{}\',\'{}\',\'{}\',\'{}\');""".format(
-                            name, surname, patronic, date, quota, town, street, houseNumber, structure,
-                            apart, position, salary, password
-                        ))
-                db.conn.commit()
-
-
-def hashFunc(s):
-    return hashlib.sha3_256(s.encode()).hexdigest()
-
-
-def sqlFilter(s):
-    bads = ["/", "\\", "|", "=", ">", "<", "CREATE", "SELECT", "FROM", "ALL", "*", "!",
-            "ALL", "ANY", "BETWEEN", "IN", "LIKE", "OR", "SOME", "(", ")", "&", "^", "%",
-            "+", "~", "DROP", "DATEBASE", "KEY", "PRIMARY", "FOREIGN", "null", "DELETE",
-            "SET", "DISTINCT", "GROUP BY", ";"]
-    for i in bads:
-        s = s.replace(i, "").replace(i.lower(), "")
-    return s.strip()
-
-
-hostnameIP = '157.230.19.140'
-dbName = "cousedb"
-port = "5432"
+                    cur.execute("""select * from register_employee(
+                                                    1::integer,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    '{}'::date,
+                                                    {}::integer ,
+                                                    '{}'::varchar,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    {}::integer,
+                                                    NULL,
+                                                    {}::integer,
+                                                    '{}'::varchar,
+                                                    {}::integer,
+                                                    '{}'::varchar
+                                                    );
+                                                     """.format(
+                        name, surname, patronic, date, quota, town, street, houseNumber, structure,
+                        apart, position, salary, password
+                    ))
+                    db.conn.commit()
 
 
 class EmployeeAuth(tk.Frame):
@@ -481,7 +553,7 @@ class EmployeeAuth(tk.Frame):
         try:
             conn = psycopg2.connect(
                 database=dbName,
-                user=self.username.get(),
+                user=sqlFilter(self.username.get()),
                 password=hashFunc(self.password.get()),
                 host=hostnameIP,
                 port=port
@@ -543,8 +615,6 @@ class EmployeeAuthRefresh:
             messagebox.showinfo("Успешное подключение", "{}:{}".format(hostnameIP, port))
             connectionFlag = True
             currentUser = self.username.get()
-            # print(self.username.get())
-            # print(db.getAvailableTables())
 
 
 class DB:
