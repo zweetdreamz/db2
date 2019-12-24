@@ -90,6 +90,19 @@ class Main(tk.Frame):
                                       compound=tk.TOP, command=self.deleteRecord)
         self.buttonDelete.pack(side=tk.RIGHT)
 
+        self.searchImg2 = tk.PhotoImage(file='search.gif')
+        self.buttonSerch2 = tk.Button(self.toolbar, text='Поиск', bg='#d7d8e0', bd=0, image=self.searchImg2,
+                                     compound=tk.TOP, command=self.search)
+        self.buttonSerch2.pack(side=tk.RIGHT)
+
+    def search(self):
+        try:
+            self.currentTable = self.availableTables[self.listBox.curselection()[0]]
+        except:
+            return
+        if self.currentTable == "employees":
+            SearchWindow()
+
     def save(self):
         try:
             self.currentTable = self.availableTables[self.listBox.curselection()[0]]
@@ -142,6 +155,7 @@ class Main(tk.Frame):
 
                 f.write(";;;;;Общая Сумма;{}".format(summ))
                 f.close()
+
     def deleteRecord(self):
         messagebox.showwarning("Удалять записи может только админ",
                                "Delete давать пользователям не безопасно\nПридётся делать защиту от дурачков")
@@ -249,6 +263,61 @@ class Main(tk.Frame):
         if self.currentTable == "warehouse":
             tables = ["ID", "Номер пиццерии", "Производитель"]
 
+class SearchWindow:
+    def __init__(self):
+        self.window = tk.Toplevel(root)
+        self.v1 = tk.StringVar()
+        self.initUI()
+
+    def initUI(self):
+        self.window.title("Поиск")
+        self.window.geometry("250x100")
+        tk.Label(self.window, text="Поиск по фамилии:").grid(row=0, column=0, sticky="w")
+        self.v1f = tk.Entry(self.window, textvariable=self.v1)
+        self.v1f.insert(0, "")
+        self.v1f.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Button(self.window,
+                  text="Поиск",
+                  background="#555",
+                  foreground="#ccc",
+                  padx="10",
+                  pady="6",
+                  command=self.click
+                  ).grid(row=6, column=1, padx=0, pady=20)
+
+    def click(self):
+        forSearch = sqlFilter(self.v1f.get())
+        tables = [" ID ", "Номер пиццерии", "Фамилия", "  Имя  ", "Отчество",
+                  "Дата рождения", "Количество рабочих часов", "Должность", "Адрес"]
+        with db.conn:
+            cur = db.conn.cursor()
+            cur.execute("""select private_number, pizzeria_number, surname, name, patronymic, birth_date,
+                            work_quota, positions.position_name, address.town, address.street, address.house_number,
+                            address.structure, address.housing, address.apart_office from employees
+                            left join address ON address.address_number = employees.address
+                            left join positions on positions.position = employees.position
+                            where surname = '{}'""".format(forSearch))
+            records = cur.fetchall()
+            db.conn.commit()
+        try:
+            app.tree.delete(*app.tree.get_children())
+            app.tree.destroy()
+        except:
+            pass
+        newRecords = []
+        for i in [list(j) for j in records]:
+            tmp = i[0:8]
+            tmp.append(" ".join(list(filter(lambda x: x != "None", map(str, i[8:])))))
+            newRecords.append(tmp)
+        app.tree = ttk.Treeview(app, height=25, show='headings', columns=tables)
+        [app.tree.column(table, width=table.__len__() * 8, anchor=tk.CENTER) for table in tables]
+        [app.tree.heading(table, text=table) for table in tables]
+        app.tree.pack()
+        [app.tree.insert('', 'end', values=row) for row in newRecords]
+        self.window.destroy()
+
+
 
 class AddRecord:
     def __init__(self):
@@ -333,6 +402,15 @@ class AddRecord:
             self.v14f.insert(0, "")
             self.v14f.grid(row=13, column=1, padx=5, pady=5)
 
+            tk.Button(self.window,
+                      text="Добавить",
+                      background="#555",
+                      foreground="#ccc",
+                      padx="10",
+                      pady="6",
+                      command=self.click
+                      ).grid(row=14, column=1, padx=0, pady=20)
+
         if app.currentTable == "orders":
             self.window.title("Добавить запись")
             self.window.geometry("250x260")
@@ -351,9 +429,16 @@ class AddRecord:
             self.v5f = tk.Entry(self.window, textvariable=self.v5)
             self.v6f = tk.Entry(self.window, textvariable=self.v6)
 
+            # with db.conn:
+            #     cur = db.conn.cursor()
+            #     cur.execute("""select private_number from employees where password = employees.password""")
+            #     rec = cur.fetchall()
+            #     db.conn.commit()
+            #
+            # h = rec
             self.v1f.insert(0, "1")
             self.v1f.grid(row=0, column=1, padx=5, pady=5)
-            self.v2f.insert(0, "1")
+            self.v2f.insert(0, rec[0].__str__())
             self.v2f.grid(row=1, column=1, padx=5, pady=5)
             self.v3f.insert(0, datetime.datetime.now().__str__().split(" ")[1].split(".")[0])
             self.v3f.grid(row=2, column=1, padx=5, pady=5)
@@ -365,14 +450,14 @@ class AddRecord:
             self.v6f.grid(row=5, column=1, padx=5, pady=5)
 
 
-        tk.Button(self.window,
-                  text="Добавить",
-                  background="#555",
-                  foreground="#ccc",
-                  padx="10",
-                  pady="6",
-                  command=self.click
-                  ).grid(row=6, column=1, padx=0, pady=20)
+            tk.Button(self.window,
+                      text="Добавить",
+                      background="#555",
+                      foreground="#ccc",
+                      padx="10",
+                      pady="6",
+                      command=self.click
+                      ).grid(row=6, column=1, padx=0, pady=20)
 
     def click(self):
         if app.currentTable == "orders":
@@ -511,6 +596,7 @@ class AddRecord:
                         apart, position, salary, password
                     ))
                     db.conn.commit()
+        self.window.destroy()
 
 
 class EmployeeAuth(tk.Frame):
@@ -565,6 +651,7 @@ class EmployeeAuth(tk.Frame):
             messagebox.showinfo("Успешное подключение", "{}:{}".format(hostnameIP, port))
             connectionFlag = True
             currentUser = self.username.get()
+            self.parent.destroy()
 
 
 class EmployeeAuthRefresh:
