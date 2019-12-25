@@ -429,13 +429,6 @@ class AddRecord:
             self.v5f = tk.Entry(self.window, textvariable=self.v5)
             self.v6f = tk.Entry(self.window, textvariable=self.v6)
 
-            # with db.conn:
-            #     cur = db.conn.cursor()
-            #     cur.execute("""select private_number from employees where password = employees.password""")
-            #     rec = cur.fetchall()
-            #     db.conn.commit()
-            #
-            # h = rec
             self.v1f.insert(0, "1")
             self.v1f.grid(row=0, column=1, padx=5, pady=5)
             self.v2f.insert(0, rec[0].__str__())
